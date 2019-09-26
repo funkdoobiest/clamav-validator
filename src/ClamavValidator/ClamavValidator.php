@@ -47,29 +47,35 @@ class ClamavValidator extends Validator
             return true;
         }
 
-        $file = $this->getFilePath($value);
-        $clamavSocket = $this->getClamavSocket();
+        try {
 
-        // Create a new socket instance
-        $socket = (new Factory())->createClient($clamavSocket);
+            $file = $this->getFilePath($value);
+            $clamavSocket = $this->getClamavSocket();
 
-        // Create a new instance of the Client
-        $quahog = new Client($socket, Config::get('clamav.socket_read_timeout'), PHP_NORMAL_READ);
+            // Create a new socket instance
+            $socket = (new Factory())->createClient($clamavSocket);
 
-        // Check if the file is readable
-        if (! is_readable($file)) {
-            throw new ClamavValidatorException(sprintf('The file "%s" is not readable', $file));
+            // Create a new instance of the Client
+            $quahog = new Client($socket, Config::get('clamav.socket_read_timeout'), PHP_NORMAL_READ);
+
+            // Check if the file is readable
+            if (! is_readable($file)) {
+                throw new ClamavValidatorException(sprintf('The file "%s" is not readable', $file));
+            }
+
+            // Scan the file
+            $result = $quahog->scanResourceStream(fopen($file, 'rb'));
+
+            if (Client::RESULT_ERROR === $result['status']) {
+                throw new ClamavValidatorException($result['reason']);
+            }
+
+            // Check if scan result is not clean
+            return Client::RESULT_OK === $result['status'];
+
+        } catch (\Xenolope\Quahog\Exception\ConnectionException | \Socket\Raw\Exception $e) {
+            return true;
         }
-
-        // Scan the file
-        $result = $quahog->scanResourceStream(fopen($file, 'rb'));
-
-        if (Client::RESULT_ERROR === $result['status']) {
-            throw new ClamavValidatorException($result['reason']);
-        }
-
-        // Check if scan result is not clean
-        return Client::RESULT_OK === $result['status'];
     }
 
     /**
