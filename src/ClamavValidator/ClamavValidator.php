@@ -74,6 +74,11 @@ class ClamavValidator extends Validator
             return Client::RESULT_OK === $result['status'];
 
         } catch (\Xenolope\Quahog\Exception\ConnectionException | \Socket\Raw\Exception $e) {
+
+            if (app()->bound('sentry')) {
+                app('sentry')->captureException($e);
+            }
+
             return true;
         }
     }
